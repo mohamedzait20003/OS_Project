@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "microhttpd.h": "c",
+        "type_traits": "c",
+        "unistd.h": "c"
+    }
+}
