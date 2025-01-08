@@ -7,6 +7,7 @@
 #include <cjson/cJSON.h>
 #include <sys/shm.h>
 #include <sys/ipc.h>
+#include <signal.h>
 
 #define PORT 8880
 #define QUEUE_SIZE 10
@@ -31,6 +32,7 @@ typedef struct {
 RequestQueue *queue;
 pthread_mutex_t *queue_mutex;
 pthread_cond_t *queue_cond;
+pid_t server_pid;
 
 void enqueue(Request request) {
     pthread_mutex_lock(queue_mutex);
@@ -95,6 +97,14 @@ const char* get_history(cJSON *json_data) {
     return response;
 }
 
+const char* terminate_server() {
+    // Terminate server operation
+    static char response[256];
+    snprintf(response, sizeof(response), "<html><body>Server is shutting down...</body></html>");
+    kill(server_pid, SIGTERM); // Send termination signal to the server process
+    return response;
+}
+
 enum MHD_Result request_handler(void *cls, struct MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls) {
     if (*con_cls == NULL) {
         RequestContext *context = malloc(sizeof(RequestContext));
@@ -126,7 +136,7 @@ enum MHD_Result request_handler(void *cls, struct MHD_Connection *connection, co
 
 void *worker_thread(void *arg) {
     while (1) {
-        if(is_queue_empty()) {
+        if (is_queue_empty()) {
             continue;
         } else {
             Request request = dequeue();
@@ -143,27 +153,50 @@ void *worker_thread(void *arg) {
                 response = transfer(request.json_data);
             } else if (strcmp(request.url, "/history") == 0) {
                 response = get_history(request.json_data);
+            } else if (strcmp(request.url, "/termination") == 0) {
+                response = terminate_server();
             } else {
                 response = "<html><body>Unknown operation</body></html>";
             }
 
-            struct MHD_Response *mhd_response = MHD_create_response_from_buffer(strlen(response), (void*)response, MHD_RESPMEM_PERSISTENT);
-            MHD_queue_response(request.connection, MHD_HTTP_OK, mhd_response);
-            MHD_destroy_response(mhd_response);
+            struct MHD_Response *mhd_response = MHD_create_response_from_buffer(strlen(response), (void*)response, MHD_RESPMEM_MUST_COPY);
+            if (mhd_response == NULL) {
+                fprintf(stderr, "Failed to create response\n");
+                continue;
+            }
 
-            if (request.json_data != NULL) {
-                cJSON_Delete(request.json_data);
+            const union MHD_ConnectionInfo *conn_info = MHD_get_connection_info(request.connection, MHD_CONNECTION_INFO_CONNECTION_FD);
+            if (conn_info == NULL) {
+                fprintf(stderr, "Connection is no longer valid for %s with connection: %p\n", request.url, request.connection);
+                if (request.json_data != NULL) {
+                    cJSON_Delete(request.json_data);
+                }
+                continue;
+            } else {
+                printf("Connection is valid for %s with connection: %p\n", request.url, request.connection);
+
+                int ret = MHD_queue_response(request.connection, MHD_HTTP_OK, mhd_response);
+                if (ret != MHD_YES) {
+                    fprintf(stderr, "Failed to queue response for %s with connection: %p\n", request.url, request.connection);
+                } else {
+                    printf("Response sent for %s with connection: %p\n", request.url, request.connection);
+                }
+
+                MHD_destroy_response(mhd_response);
+
+                if (request.json_data != NULL) {
+                    cJSON_Delete(request.json_data);
+                }
             }
         }
     }
     return NULL;
 }
 
-
-
 int main() {
-    struct MHD_Daemon *daemon;
-
+    // Store the server process ID
+    server_pid = getpid();
+    
     // Initialize shared memory
     int shmid = shmget(SHM_KEY, sizeof(RequestQueue) + sizeof(pthread_mutex_t) + sizeof(pthread_cond_t), IPC_CREAT | 0666);
     if (shmid < 0) {
@@ -196,21 +229,23 @@ int main() {
     pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
     pthread_cond_init(queue_cond, &cond_attr);
 
-    // Threads
+    // Create worker threads
     pthread_t workers[4];
     for (int i = 0; i < 4; i++) {
         pthread_create(&workers[i], NULL, worker_thread, NULL);
     }
 
     // Start the server
-    daemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, PORT, NULL, NULL, &request_handler, NULL, MHD_OPTION_END);
+    struct MHD_Daemon *daemon;
+    daemon = MHD_start_daemon(MHD_NO_FLAG, PORT, NULL, NULL, &request_handler, NULL, MHD_OPTION_END);
     if (NULL == daemon) return 1;
 
     printf("Server running on port %d\n", PORT);
 
     // Keep the server running indefinitely
-    for (int i = 0; i < 4; i++) {
-        pthread_join(workers[i], NULL);
+    while (1) {
+        MHD_run(daemon);
+        sleep(1);
     }
 
     MHD_stop_daemon(daemon);

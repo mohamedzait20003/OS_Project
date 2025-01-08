@@ -1,0 +1,10 @@
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+*.orig
+
+# Ignore build files
+/server/server

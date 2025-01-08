@@ -2,6 +2,7 @@
     "files.associations": {
         "microhttpd.h": "c",
         "type_traits": "c",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "ipc.h": "c"
     }
 }
