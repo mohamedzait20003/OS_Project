@@ -3,6 +3,7 @@
         "microhttpd.h": "c",
         "type_traits": "c",
         "unistd.h": "c",
-        "ipc.h": "c"
+        "ipc.h": "c",
+        "stdio.h": "c"
     }
 }

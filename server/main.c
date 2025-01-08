@@ -62,38 +62,10 @@ int is_queue_empty() {
     return empty;
 }
 
-const char* withdraw(cJSON *json_data) {
-    // Perform withdraw operation
+const char* generate_report() {
+    // Generate report operation
     static char response[256];
-    snprintf(response, sizeof(response), "<html><body>Withdraw of 300 successful for user Ahmed with id 12048</body></html>");
-    return response;
-}
-
-const char* deposit(cJSON *json_data) {
-    // Perform deposit operation
-    static char response[256];
-    snprintf(response, sizeof(response), "<html><body>Deposit of 300 successful for user Ahmed with id 12048</body></html>");
-    return response;
-}
-
-const char* check_balance(cJSON *json_data) {
-    // Check balance operation
-    static char response[256];
-    snprintf(response, sizeof(response), "<html><body>Current balance for user Ahmed with id 12048: 1000</body></html>"); // Placeholder balance
-    return response;
-}
-
-const char* transfer(cJSON *json_data) {
-    // Perform transfer operation
-    static char response[256];
-    snprintf(response, sizeof(response), "<html><body>Transfer of 300 successful for user Ahmed with id 12048</body></html>");
-    return response;
-}
-
-const char* get_history(cJSON *json_data) {
-    // Get transaction history
-    static char response[256];
-    snprintf(response, sizeof(response), "<html><body>Transaction history for user Ahmed with id 12048</body></html>");
+    snprintf(response, sizeof(response), "<html><body>Generating report...</body></html>");
     return response;
 }
 
@@ -102,6 +74,22 @@ const char* terminate_server() {
     static char response[256];
     snprintf(response, sizeof(response), "<html><body>Server is shutting down...</body></html>");
     kill(server_pid, SIGTERM); // Send termination signal to the server process
+    return response;
+}
+
+const char* pause_server(){
+    // Pause server operation
+    static char response[256];
+    snprintf(response, sizeof(response), "<html><body>Server is paused...</body></html>");
+    kill(server_pid, SIGSTOP); // Send pause signal to the server process
+    return response;
+}
+
+const char* resume_server(){
+    // Resume server operation
+    static char response[256];
+    snprintf(response, sizeof(response), "<html><body>Server is resumed...</body></html>");
+    kill(server_pid, SIGCONT); // Send resume signal to the server process
     return response;
 }
 
@@ -143,18 +131,13 @@ void *worker_thread(void *arg) {
             printf("Processing request for %s\n", request.url);
 
             const char *response;
-            if (strcmp(request.url, "/withdraw") == 0) {
-                response = withdraw(request.json_data);
-            } else if (strcmp(request.url, "/deposit") == 0) {
-                response = deposit(request.json_data);
-            } else if (strcmp(request.url, "/balance") == 0) {
-                response = check_balance(request.json_data);
-            } else if (strcmp(request.url, "/transfer") == 0) {
-                response = transfer(request.json_data);
-            } else if (strcmp(request.url, "/history") == 0) {
-                response = get_history(request.json_data);
-            } else if (strcmp(request.url, "/termination") == 0) {
+            if (strcmp(request.url, "/termination") == 0) {
                 response = terminate_server();
+            } else if(strcmp(request.url, "/pause") == 0) {
+                response = pause_server();
+            } else if(strcmp(request.url, "/continue") == 0) {
+                response = resume_server();
+            } else if(strcmp(request.url, "/generate_report") == 0) {
             } else {
                 response = "<html><body>Unknown operation</body></html>";
             }
@@ -196,7 +179,7 @@ void *worker_thread(void *arg) {
 int main() {
     // Store the server process ID
     server_pid = getpid();
-    
+
     // Initialize shared memory
     int shmid = shmget(SHM_KEY, sizeof(RequestQueue) + sizeof(pthread_mutex_t) + sizeof(pthread_cond_t), IPC_CREAT | 0666);
     if (shmid < 0) {
@@ -245,7 +228,6 @@ int main() {
     // Keep the server running indefinitely
     while (1) {
         MHD_run(daemon);
-        sleep(1);
     }
 
     MHD_stop_daemon(daemon);
