@@ -1,3 +1,4 @@
+// Libraries
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,6 +9,9 @@
 #include <sys/shm.h>
 #include <sys/ipc.h>
 #include <signal.h>
+
+// Header Files
+#include "Headers/Generate_Report.h"
 
 #define PORT 8880
 #define QUEUE_SIZE 10
@@ -138,6 +142,7 @@ void *worker_thread(void *arg) {
             } else if(strcmp(request.url, "/continue") == 0) {
                 response = resume_server();
             } else if(strcmp(request.url, "/generate_report") == 0) {
+                response = generate_report();
             } else {
                 response = "<html><body>Unknown operation</body></html>";
             }
