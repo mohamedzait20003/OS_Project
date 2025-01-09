@@ -20,23 +20,24 @@ const char* generate_report() {
     char buffer[1024];
 
     sqlite3_stmt *stmt;
-    const char *sql = "SELECT 
-        Inventory.Item AS ItemName,
-        SUM(OrderItems.Amount) AS AmountSold
-    FROM 
-        OrderItems
-    JOIN 
-        Orders ON OrderItems.OrderId = Orders.Id
-    JOIN 
-        Inventory ON OrderItems.ItemId = Inventory.Id
-    WHERE 
-        DATE(Orders.OrderDate) = DATE('now')
-    GROUP BY 
-        Inventory.Item
-    ORDER BY 
-        Inventory.Item";
+    const char *sql = "SELECT "
+                      "Inventory.Item AS ItemName, "
+                      "SUM(OrderItems.Amount) AS AmountSold "
+                      "FROM "
+                      "OrderItems "
+                      "JOIN "
+                      "Orders ON OrderItems.OrderId = Orders.Id "
+                      "JOIN "
+                      "Inventory ON OrderItems.ItemId = Inventory.Id "
+                      "WHERE "
+                      "DATE(Orders.OrderDate) = DATE('now') "
+                      "GROUP BY "
+                      "Inventory.Item "
+                      "ORDER BY "
+                      "Inventory.Item";
     
-    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+    int rc;
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
     if (rc != SQLITE_OK)
     {
         snprintf(response, sizeof(response), "Internal Server Error \n");
