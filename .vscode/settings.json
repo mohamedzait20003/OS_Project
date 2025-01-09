@@ -5,6 +5,11 @@
         "unistd.h": "c",
         "ipc.h": "c",
         "stdio.h": "c",
-        "signal.h": "c"
+        "signal.h": "c",
+        "generate_report.h": "c",
+        "cjson.h": "c",
+        "update_inventory.h": "c",
+        "wait.h": "c",
+        "process_orders.h": "c"
     }
 }

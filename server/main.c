@@ -9,16 +9,22 @@
 #include <sys/shm.h>
 #include <sys/ipc.h>
 #include <signal.h>
+#include <errno.h>
+#include <sqlite3.h>
 
 // Header Files
-#include "Headers/Generate_Report.h"
+#include "Headers/Update_Inventory.h"
+#include "Headers/View_Inventory.h"
+#include "Headers/Process_Orders.h"
 
+// Macros
 #define PORT 8880
-#define QUEUE_SIZE 10
-#define SHM_KEY 1234
+#define QUEUE_SIZE 100
+#define SHM_KEY 5763
 
 typedef struct {
     const char *url;
+    const char* method;
     cJSON *json_data;
     struct MHD_Connection *connection;
 } Request;
@@ -38,11 +44,14 @@ pthread_mutex_t *queue_mutex;
 pthread_cond_t *queue_cond;
 pid_t server_pid;
 
+// Database
+sqlite3 *db;
+
 void enqueue(Request request) {
     pthread_mutex_lock(queue_mutex);
+    char *json_string = cJSON_Print(request.json_data);
     queue->requests[queue->rear] = request;
     queue->rear = (queue->rear + 1) % QUEUE_SIZE;
-    printf("Queued Requests: %d\n", queue->rear);
     pthread_cond_signal(queue_cond);
     pthread_mutex_unlock(queue_mutex);
 }
@@ -53,7 +62,6 @@ Request dequeue() {
         pthread_cond_wait(queue_cond, queue_mutex);
     }
     Request request = queue->requests[queue->front];
-    printf("Dequeued Request: %d\n", queue->front);
     queue->front = (queue->front + 1) % QUEUE_SIZE;
     pthread_mutex_unlock(queue_mutex);
     return request;
@@ -64,13 +72,6 @@ int is_queue_empty() {
     int empty = (queue->front == queue->rear);
     pthread_mutex_unlock(queue_mutex);
     return empty;
-}
-
-const char* generate_report() {
-    // Generate report operation
-    static char response[256];
-    snprintf(response, sizeof(response), "<html><body>Generating report...</body></html>");
-    return response;
 }
 
 const char* terminate_server() {
@@ -111,13 +112,14 @@ enum MHD_Result request_handler(void *cls, struct MHD_Connection *connection, co
     if (*upload_data_size != 0) {
         json_data = cJSON_Parse(upload_data);
         if (json_data == NULL) {
+            fprintf(stderr, "Failed to parse JSON data\n");
             return MHD_NO;
         }
     }
 
     // Handle the request, whether it has a JSON body or not
-    if (*upload_data_size == 0 && context->enqueued == 0) {
-        Request request = {url, json_data, connection};
+    if (context->enqueued == 0) {
+        Request request = {url, method, json_data, connection};
         enqueue(request);
         context->enqueued = 1; // Mark the request as enqueued
     }
@@ -135,16 +137,92 @@ void *worker_thread(void *arg) {
             printf("Processing request for %s\n", request.url);
 
             const char *response;
-            if (strcmp(request.url, "/termination") == 0) {
-                response = terminate_server();
-            } else if(strcmp(request.url, "/pause") == 0) {
-                response = pause_server();
-            } else if(strcmp(request.url, "/continue") == 0) {
-                response = resume_server();
-            } else if(strcmp(request.url, "/generate_report") == 0) {
-                response = generate_report();
-            } else {
-                response = "<html><body>Unknown operation</body></html>";
+            if(strcmp(request.method, "GET") == 0){
+                if(strcmp(request.url, "/view_inventory") == 0) {
+                    response = view_inventory();
+                } else {
+                    response = "Unknown operation";
+                }
+            } else if(strcmp(request.method, "POST") == 0){
+                if (strcmp(request.url, "/update_inventory") == 0) {
+                    if (request.json_data == NULL) {
+                        fprintf(stderr, "No JSON data received\n");
+                        response = "No JSON data received";
+                    } else {
+                        cJSON *item = cJSON_GetObjectItem(request.json_data, "Item");
+                        cJSON *amount = cJSON_GetObjectItem(request.json_data, "Amount");
+                        
+                        if (item == NULL || amount == NULL) {
+                            fprintf(stderr, "Failed to get 'Item' or 'Amount' from JSON data\n");
+                            response = "Invalid JSON data\n";
+                        } else {
+                            const char *item_value = cJSON_GetStringValue(item);
+                            int amount_value = cJSON_GetNumberValue(amount);
+                            
+                            if (item_value == NULL || amount_value == 0) {
+                                fprintf(stderr, "Failed to convert 'Item' or 'Amount' to appropriate types\n");
+                                response = "Invalid number format\n";
+                            } else {
+                                response = UpdateInventory(item_value, amount_value);
+                            }
+                        }
+                    }
+                } else if(strcmp(request.url, "/process_orders") == 0){
+                    if (request.json_data == NULL) {
+                        fprintf(stderr, "No JSON data received\n");
+                        response = "No JSON data received";
+                    } else {
+                        cJSON *client = cJSON_GetObjectItem(request.json_data, "Client");
+                        cJSON *items = cJSON_GetObjectItem(request.json_data, "Items");
+                        
+                        if (items == NULL || client == NULL || !cJSON_IsArray(items)) {
+                            fprintf(stderr, "Failed to get 'Items' array from JSON data\n");
+                            response = "Invalid JSON data\n";
+                        } else {
+                            int items_count = cJSON_GetArraySize(items);
+                            const char **item_names = malloc(items_count * sizeof(char *));
+                            int *item_amounts = malloc(items_count * sizeof(int));
+
+                            if(item_names == NULL || item_amounts == NULL){
+                                fprintf(stderr, "Failed to allocate memory for items\n");
+                                response = "Internal server error\n";
+                            } else {
+                                cJSON *item = NULL;
+                                int index = 0;
+
+                                cJSON_ArrayForEach(item, items){
+                                    cJSON *item_name = cJSON_GetObjectItem(item, "Item");
+                                    cJSON *item_value = cJSON_GetObjectItem(item, "Value");
+
+                                    if(item_name == NULL || item_value == NULL){
+                                        fprintf(stderr, "Failed to get 'Item' or 'Value' from JSON data\n");
+                                        response = "Invalid JSON data\n";
+                                        break;
+                                    }
+
+                                    const char *item_name_value = cJSON_GetStringValue(item_name);
+                                    int item_value_value = cJSON_GetNumberValue(item_value);
+                                    if(item_name_value == NULL || item_value_value == 0){
+                                       fprintf(stderr, "Invalid item name or value\n");
+                                        response = "Invalid Item format\n";
+                                        break;
+                                    }
+
+                                    item_names[index] = item_name_value;
+                                    item_amounts[index] = item_value_value;
+                                    index++;
+                                }
+
+                                response = process_order(client->valuestring, item_names, item_amounts, items_count);
+
+                                free(item_names);
+                                free(item_amounts);
+                            }
+                        }
+                    }
+                } else {
+                    response = "Unknown operation";
+                }
             }
 
             struct MHD_Response *mhd_response = MHD_create_response_from_buffer(strlen(response), (void*)response, MHD_RESPMEM_MUST_COPY);
@@ -161,8 +239,6 @@ void *worker_thread(void *arg) {
                 }
                 continue;
             } else {
-                printf("Connection is valid for %s with connection: %p\n", request.url, request.connection);
-
                 int ret = MHD_queue_response(request.connection, MHD_HTTP_OK, mhd_response);
                 if (ret != MHD_YES) {
                     fprintf(stderr, "Failed to queue response for %s with connection: %p\n", request.url, request.connection);
@@ -223,6 +299,14 @@ int main() {
         pthread_create(&workers[i], NULL, worker_thread, NULL);
     }
 
+    // Initialize the database
+    int rc = sqlite3_open("Database/Database.db", &db);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+        return 1;
+    }
+    fprintf(stderr, "Database opened successfully\n");
+
     // Start the server
     struct MHD_Daemon *daemon;
     daemon = MHD_start_daemon(MHD_NO_FLAG, PORT, NULL, NULL, &request_handler, NULL, MHD_OPTION_END);
@@ -236,5 +320,6 @@ int main() {
     }
 
     MHD_stop_daemon(daemon);
+    sqlite3_close(db);
     return 0;
 }

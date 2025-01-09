@@ -12,7 +12,8 @@ checkout_counters() {
 }
 
 update_inventory() {
-    curl -X POST http://localhost:8880/update_inventory -d '{"key":"value"}' -H "Content-Type: application/json"
+    read -p "Enter Number of Items: " Number
+    curl -X POST http://localhost:8880/update_inventory -d "{\"Items\":\"$Number\"}" -H "Content-Type: application/json"
 }
 
 generate_report() {

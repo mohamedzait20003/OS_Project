@@ -1,10 +1,10 @@
 #!/bin/bash
 
-echo "Starting the daemon process using nohup"
+echo "Starting the daemon process"
 nohup bash -c 'while true; do sleep 1; done' > /dev/null 2>&1 &
 
 echo "Compiling the C program"
-gcc -o server main.c -lmicrohttpd -lcjson -lpthread
+gcc -o server main.c -lmicrohttpd -lcjson -lpthread -lsqlite3
 if [ $? -ne 0 ]; then
     echo "Compilation failed"
     exit 1
