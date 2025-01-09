@@ -7,9 +7,7 @@ PS3="Please select an option: "
 # Menu options
 options=("Start Checkout Counters" "Update Inventory" "Generate Sales Report" "Process Order" "Exit")
 
-checkout_counters() {
-   curl -X POST http://localhost:8880/checkout_counters -d '{"key":"value"}' -H "Content-Type: application/json"
-}
+
 
 update_inventory() {
     read -p "Enter Number of Items: " Number

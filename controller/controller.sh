@@ -1,9 +1,8 @@
 #!/bin/bash
-
-SERVER_PID=$(pgrep -f "./server")
+SERVER_PIDS=$(pgrep -f "./server")
 
 # Check if the server is running
-if [ -z "$SERVER_PID" ]; then
+if [ -z "$SERVER_PIDS" ]; then
     echo "Server is not running."
 else
     

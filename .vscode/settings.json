@@ -10,6 +10,7 @@
         "cjson.h": "c",
         "update_inventory.h": "c",
         "wait.h": "c",
-        "process_orders.h": "c"
+        "process_orders.h": "c",
+        "shm.h": "c"
     }
 }

@@ -1,29 +1,29 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
+// Guards
+#ifndef GENERATE_REPORT_H
+#define GENERATE_REPORT_H
 
-#define SHM_KEY_SALES 5678 
+// Libraries
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sqlite3.h>
+#include <stdbool.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <pthread.h>
+
+extern sqlite3 *db;
 
 const char* generate_report() {
     static char response[256];
-    int shmid_sales = shmget(SHM_KEY_SALES, sizeof(int), 0666);
 
-    if (shmid_sales < 0) {
-        perror("Shared memory access failed");
-        exit(1);
-        return response;
-    }
+    sqlite3_stmt *stmt;
+    const char *sql = "SELECT FROM OrderItems WHERE OrderId = ? IN ";
 
-    int *sales = (int *)shmat(shmid_sales, NULL, 0);
-
-    if (sales == (void *)-1) {
-        perror("Shared memory attachment failed");
-        exit(1);
-    }
     
-    snprintf(response, sizeof(response), "<html><body>Total items sold: %d</body></html>", *sales);
-    shmdt(sales);
 
     return response;
 }
+
+#endif // GENERATE_REPORT_H

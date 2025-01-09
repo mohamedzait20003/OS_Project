@@ -86,30 +86,76 @@ int create_order(const char *client, int item_count){
 }
 
 int adjust_order_items(int Id, const char **items, const int *amounts, int item_count){
-    for(int i = 0; i < item_count; i++){
+    for (int i = 0; i < item_count; i++) {
         sqlite3_stmt *stmt;
-        const char *sql = "INSERT INTO OrderItems (OrderId, Item , Amount) VALUES (?, ?, ?)";
+        const char *query_select = "SELECT Id FROM Inventory WHERE Item = ?";
+        const char *query_insert = "INSERT INTO OrderItems (OrderId, ItemId, Amount) VALUES (?, ?, ?)";
+        const char *query_update = "UPDATE Inventory SET Amount = Amount - ? WHERE Id = ?";
 
-        int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        // Prepare the SELECT statement
+        int rc = sqlite3_prepare_v2(db, query_select, -1, &stmt, 0);
         if (rc != SQLITE_OK) {
-            fprintf(stderr, "Failed to prepare statement: %s\n", sqlite3_errmsg(db));
+            fprintf(stderr, "Failed to prepare SELECT statement: %s\n", sqlite3_errmsg(db));
             return -1;
         }
 
+        // Bind the item name to the SELECT statement
+        sqlite3_bind_text(stmt, 1, items[i], -1, SQLITE_STATIC);
+
+        // Execute the SELECT statement
+        rc = sqlite3_step(stmt);
+        int item_id = 0;
+        if (rc == SQLITE_ROW) {
+            item_id = sqlite3_column_int(stmt, 0);
+        } else {
+            fprintf(stderr, "Item not found in inventory: %s\n", items[i]);
+            sqlite3_finalize(stmt);
+            return -1;
+        }
+        sqlite3_finalize(stmt);
+
+        // Prepare the INSERT statement
+        rc = sqlite3_prepare_v2(db, query_insert, -1, &stmt, 0);
+        if (rc != SQLITE_OK) {
+            fprintf(stderr, "Failed to prepare INSERT statement: %s\n", sqlite3_errmsg(db));
+            return -1;
+        }
+
+        // Bind the order ID, item ID, and amount to the INSERT statement
         sqlite3_bind_int(stmt, 1, Id);
-        sqlite3_bind_text(stmt, 2, items[i], -1, SQLITE_STATIC);
+        sqlite3_bind_int(stmt, 2, item_id);
         sqlite3_bind_int(stmt, 3, amounts[i]);
 
+        // Execute the INSERT statement
         rc = sqlite3_step(stmt);
-        if(rc != SQLITE_DONE){
+        if (rc != SQLITE_DONE) {
             fprintf(stderr, "Failed to create order item: %s\n", sqlite3_errmsg(db));
             sqlite3_finalize(stmt);
             return -1;
         }
 
+        rc = sqlite3_prepare_v2(db, query_update, -1, &stmt, 0);
+        if (rc != SQLITE_OK) {
+            fprintf(stderr, "Failed to prepare UPDATE statement: %s\n", sqlite3_errmsg(db));
+            return -1;
+        }
+
+        // Bind the amount and item ID to the UPDATE statement
+        sqlite3_bind_int(stmt, 1, amounts[i]);
+        sqlite3_bind_int(stmt, 2, item_id);
+
+        // Execute the UPDATE statement
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE) {
+            fprintf(stderr, "Failed to update inventory: %s\n", sqlite3_errmsg(db));
+            sqlite3_finalize(stmt);
+            return -1;
+        }
+
         sqlite3_finalize(stmt);
-        return 0;
     }
+
+    return 0;
 }
 
 // Error Recovery
