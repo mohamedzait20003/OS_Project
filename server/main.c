@@ -16,6 +16,7 @@
 #include "Headers/Update_Inventory.h"
 #include "Headers/View_Inventory.h"
 #include "Headers/Process_Orders.h"
+#include "Headers/Generate_Report.h"
 
 // Macros
 #define PORT 8880
@@ -142,9 +143,13 @@ void *worker_thread(void *arg) {
             if(strcmp(request.method, "GET") == 0){
                 if(strcmp(request.url, "/view_inventory") == 0) {
                     response = view_inventory();
-                } else {
+                } else if(strcmp(request.url, "/generate_report")==0){
+                    response = generate_report();
+                }
+                else {
                     response = "Unknown operation";
                 }
+                
             } else if(strcmp(request.method, "POST") == 0){
                 if (strcmp(request.url, "/update_inventory") == 0) {
                     if (request.json_data == NULL) {
