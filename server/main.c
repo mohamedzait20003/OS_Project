@@ -21,9 +21,7 @@
 // Macros
 #define PORT 8880
 #define QUEUE_SIZE 100
-#define SHM_KEY 5763
-#define SHM_KEY_INVENTORY 1234
-#define SHM_KEY_SALES 5678  
+#define SHM_KEY 3445
 
 typedef struct {
     const char *url;
@@ -82,22 +80,6 @@ const char* terminate_server() {
     static char response[256];
     snprintf(response, sizeof(response), "<html><body>Server is shutting down...</body></html>");
     kill(server_pid, SIGTERM); // Send termination signal to the server process
-    return response;
-}
-
-const char* pause_server(){
-    // Pause server operation
-    static char response[256];
-    snprintf(response, sizeof(response), "<html><body>Server is paused...</body></html>");
-    kill(server_pid, SIGSTOP); // Send pause signal to the server process
-    return response;
-}
-
-const char* resume_server(){
-    // Resume server operation
-    static char response[256];
-    snprintf(response, sizeof(response), "<html><body>Server is resumed...</body></html>");
-    kill(server_pid, SIGCONT); // Send resume signal to the server process
     return response;
 }
 

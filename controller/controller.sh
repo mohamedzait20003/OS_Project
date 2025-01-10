@@ -5,5 +5,11 @@ SERVER_PIDS=$(pgrep -f "./server")
 if [ -z "$SERVER_PIDS" ]; then
     echo "Server is not running."
 else
-    
+    gcc -o controller main.c
+
+    if [ $? -ne 0 ]; then
+        echo "Failed to compile controller.c"
+        exit 1
+    fi
+    ./controller $SERVER_PIDS
 fi

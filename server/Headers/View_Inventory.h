@@ -14,7 +14,7 @@ const char* view_inventory() {
     char buffer[1024];
     sqlite3_stmt *stmt;
 
-    const char *sql = "SELECT Item, Amount FROM Inventory";
+    const char *sql = "SELECT Id, Item, Amount FROM Inventory";
 
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
     if (rc != SQLITE_OK) {
