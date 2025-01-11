@@ -31,7 +31,7 @@ const char* generate_report() {
     }
 
     snprintf(response, sizeof(response), "Report: (Sold Items in the day)\n\nItem\tAmount\n");
-    
+
     while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         const unsigned char *item_name = sqlite3_column_text(stmt, 0);
         int amount_sold = sqlite3_column_int(stmt, 1);
