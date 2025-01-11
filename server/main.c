@@ -22,7 +22,6 @@
 #define PORT 8880
 #define QUEUE_SIZE 100
 #define SHM_KEY 3446
-#define SHM_KEY 3447
 
 typedef struct {
     const char *url;
