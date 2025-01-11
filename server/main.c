@@ -21,7 +21,7 @@
 // Macros
 #define PORT 8880
 #define QUEUE_SIZE 100
-#define SHM_KEY 3447
+#define SHM_KEY 3677
 
 typedef struct {
     const char *url;
@@ -133,7 +133,9 @@ void *worker_thread(void *arg) {
                 }
                 
             } else if(strcmp(request.method, "POST") == 0){
-                if (strcmp(request.url, "/update_inventory") == 0) {
+                if (strcmp(request.url, "/terminate") == 0) {
+                    response = terminate_server();
+                } else if (strcmp(request.url, "/update_inventory") == 0) {
                     if (request.json_data == NULL) {
                         fprintf(stderr, "No JSON data received\n");
                         response = "No JSON data received";
@@ -257,6 +259,7 @@ int main() {
         exit(1);
     }
 
+    // Attach to the shared memory
     void *shared_memory = shmat(shmid, NULL, 0);
     if (shared_memory == (void *)-1) {
         perror("Shared memory attachment failed");
